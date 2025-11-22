@@ -36,24 +36,23 @@ function persistLocalVehicles(list) {
   }
 }
 
-function saveLocalVehicle(vehicle) {
-  if (!vehicle) return;
-  const current = loadLocalVehicles().filter(
-    (item) => String(item.id) !== String(vehicle.id)
-  );
-  persistLocalVehicles([...current, vehicle]);
-}
-
-function removeLocalVehicle(id) {
-  const filtered = loadLocalVehicles().filter(
-    (item) => String(item.id) !== String(id)
-  );
-  persistLocalVehicles(filtered);
-}
-
 function combineVehicles() {
   const locals = loadLocalVehicles();
   return [...locals, ...vehiclesMock];
+}
+
+function uniqueVehicles(list) {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of list.map(normalizeVehicle)) {
+    const id = String(item?.id ?? "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(item);
+  }
+
+  return result;
 }
 
 function applyFilters(list = [], params = {}) {
@@ -105,7 +104,7 @@ export function normalizeVehicle(raw) {
 export async function listVehicles(params = {}) {
   if (useMocks) {
     await delay(300);
-    return applyFilters(combineVehicles(), params);
+    return applyFilters(uniqueVehicles(combineVehicles()), params);
   }
 
   const hasValue = (value) =>
@@ -137,16 +136,13 @@ export async function listVehicles(params = {}) {
     params: queryParams,
   });
   const serverItems = Array.isArray(res.data.items) ? res.data.items : [];
-  const localItems = loadLocalVehicles();
+  const merged = uniqueVehicles(serverItems);
 
-  const { items, total } = applyFilters(
-    [...localItems, ...serverItems],
-    {
-      ...params,
-      page: params.page ?? 1,
-      pageSize: params.pageSize ?? 12,
-    }
-  );
+  const { items, total } = applyFilters(merged, {
+    ...params,
+    page: params.page ?? 1,
+    pageSize: params.pageSize ?? 12,
+  });
 
   return { items, total: res.data?.total ?? total };
 }
@@ -195,7 +191,6 @@ export async function createVehicle(payload) {
 
   const res = await api.post("/vehicles", payload);
   const created = normalizeVehicle(res.data);
-  saveLocalVehicle(created);
   return created;
 }
 
@@ -210,9 +205,7 @@ export async function updateVehicle(id, payload) {
   }
 
   const res = await api.patch(`/vehicles/${id}`, payload);
-  const updated = normalizeVehicle(res.data);
-  saveLocalVehicle(updated);
-  return updated;
+  return normalizeVehicle(res.data);
 }
 
 export async function deleteVehicle(id) {
@@ -223,7 +216,6 @@ export async function deleteVehicle(id) {
   }
 
   await api.delete(`/vehicles/${id}`);
-  removeLocalVehicle(id);
 }
 
 export async function getRecommendations(baseId) {

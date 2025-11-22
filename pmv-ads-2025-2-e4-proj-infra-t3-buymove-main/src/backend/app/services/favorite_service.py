@@ -72,6 +72,9 @@ def serialize_favorite(document: dict | None, vehicle_document: dict | None) -> 
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favorito n?o encontrado")
     data = object_id_to_str(document)
+    # Remove any raw vehicle data coming from aggregation to avoid validation
+    # errors (object ids / missing ids) before we serialize it properly below.
+    data.pop("vehicle", None)
     data["vehicle_id"] = str(document["vehicle_id"])
     favorite = FavoritePublic.model_validate(data)
     if vehicle_document:
