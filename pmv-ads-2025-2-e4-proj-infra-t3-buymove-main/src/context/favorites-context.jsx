@@ -53,10 +53,12 @@ export function FavoritesProvider({ children }) {
       if (!vehicle?.id) return;
 
       if (shouldUseRemote) {
-        const exists = favorites.some((item) => item.id === vehicle.id);
+        const existingEntry = favorites.find((item) => item.id === vehicle.id);
+        const exists = Boolean(existingEntry);
         try {
           if (exists) {
-            await removeFavorite(vehicle.id);
+            const remoteId = existingEntry?.favoriteId ?? vehicle.id;
+            await removeFavorite(remoteId);
             setFavorites((prev) => prev.filter((item) => item.id !== vehicle.id));
           } else {
             const created = await addFavorite(vehicle.id);
@@ -85,7 +87,9 @@ export function FavoritesProvider({ children }) {
     async (id) => {
       if (shouldUseRemote) {
         try {
-          await removeFavorite(id);
+          const entry = favorites.find((item) => item.id === id);
+          const remoteId = entry?.favoriteId ?? id;
+          await removeFavorite(remoteId);
           setFavorites((prev) => prev.filter((item) => item.id !== id));
         } catch (err) {
           setError(err instanceof Error ? err.message : String(err));
